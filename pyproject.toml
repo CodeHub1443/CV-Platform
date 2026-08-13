@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cv-platform"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.4", "pytest-cov>=4.1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["cv_platform"]

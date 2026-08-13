@@ -1,0 +1,31 @@
+knowledge:
+
+  cv-platform-architecture:
+    name: CV Platform Final Architecture v1.0
+    description: Authoritative CV Platform platform architecture and architectural laws
+    path: docs/architecture/final-architecture-v1.0.md
+
+  platform-contracts:
+    name: CV Platform Platform Contracts v1.0
+    description: Authoritative immutable interfaces and platform dependency rules
+    path: docs/contracts/platform-contracts-v1.0.md
+
+  technology-stack:
+    name: CV Platform Technology Stack v1.0
+    description: Authoritative infrastructure and technology standards
+    path: docs/standards/technology-stack-v1.0.md
+
+  deepstream:
+    name: DeepStream SDK
+    description: NVIDIA DeepStream SDK integration and pipeline patterns
+    path: knowledge/technologies/deepstream/
+
+  tensorrt:
+    name: TensorRT Optimization
+    description: TensorRT model optimization and deployment guidelines
+    path: knowledge/technologies/tensorrt/
+
+  jetson:
+    name: Jetson Platform
+    description: NVIDIA Jetson hardware and OS configurations
+    path: knowledge/technologies/jetson/

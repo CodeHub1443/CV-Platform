@@ -1,0 +1,17 @@
+capabilities:
+
+  api:
+    module: api-core
+    repository: ""
+    version: ""
+    status: stable
+    knowledge:
+      - api
+
+  database:
+    module: db-core
+    repository: ""
+    version: ""
+    status: stable
+    knowledge:
+      - database

@@ -1,0 +1,47 @@
+acceptance_criteria:
+- File is valid PostgreSQL DDL that executes without error against a clean PostgreSQL
+  instance
+- 'Tables created: projects, sites, camera_configs, ai_applications, models, rules,
+  scene_configs, users, project_users, feature_flags, deployments'
+- Every table includes version INTEGER NOT NULL DEFAULT 1, owner VARCHAR(255) NOT
+  NULL, effective_date TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT
+  NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+- All primary keys are UUID using gen_random_uuid() as default
+- 'FK constraints with ON DELETE RESTRICT enforce: sites→projects, camera_configs→sites,
+  ai_applications→projects, models→ai_applications, rules→ai_applications, scene_configs→camera_configs,
+  deployments→projects'
+- deployments table contains ai_application_ref UUID and site_ref UUID without FK
+  constraints, plus ai_application_snapshot JSONB NOT NULL and site_snapshot JSONB
+  NOT NULL
+- project_users join table has composite PK (project_id, user_id), FK to projects
+  and users, and a role VARCHAR(100) NOT NULL column
+- All FK columns have a covering index
+- Status and role enum-like fields use VARCHAR with CHECK constraints, not PostgreSQL
+  ENUM types
+- 'JSONB columns present where specified: camera_configs.credentials, camera_configs.resolution,
+  camera_configs.capabilities, models.parameters, rules.parameters, scene_configs.rois,
+  scene_configs.zones, scene_configs.ground_plane, scene_configs.privacy_masks, scene_configs.calibration,
+  deployments.ai_application_snapshot, deployments.site_snapshot'
+- No application code is present in the DDL file
+capabilities:
+- database
+depends_on:
+- CVP-002
+id: CVP-003
+inputs:
+- CVP-002 PostgreSQL schema specification
+knowledge:
+- cv-platform-architecture
+- platform-contracts
+- technology-stack
+outputs:
+- schema/configuration/V001__create_configuration_platform_schema.sql — versioned
+  migration file containing all CREATE TABLE statements, indexes, and constraints
+  for the 10 Configuration Platform entities plus the project_users join table
+owner: Claude Code
+priority: high
+role: developer
+shared_modules:
+- db-core
+status: done
+title: Implement Configuration Platform PostgreSQL DDL schema

@@ -1,0 +1,33 @@
+acceptance_criteria:
+- 'One service per entity group: ProjectService, SiteService, CameraConfigService,
+  AIApplicationService, ModelService, RuleService, SceneConfigService, UserService,
+  FeatureFlagService, DeploymentService'
+- Each service validates inputs before delegating to repositories
+- Services coordinate cross-entity rules, for example preventing deletion of a Project
+  that has active Deployments
+- Services return domain objects — ConfigurationObject serialization is the responsibility
+  of the API layer, not the service layer
+- Services do not import or depend on the API layer
+- Services do not import internal libraries of any other platform
+capabilities:
+- api
+- database
+depends_on:
+- CVP-003
+id: CVP-004
+inputs:
+- Repository implementations (CVP-003)
+- Configuration Platform baseline specification (CVP-001)
+knowledge:
+- cv-platform-architecture
+- platform-contracts
+outputs:
+- Service layer implementing validation, versioning enforcement, and entity lifecycle
+  management
+owner: Claude Code
+priority: high
+role: developer
+shared_modules:
+- db-core
+status: done
+title: Implement Configuration Platform service layer

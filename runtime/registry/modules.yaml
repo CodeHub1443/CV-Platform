@@ -1,0 +1,11 @@
+modules:
+
+  api-core:
+    repository: ""
+    version: ""
+    status: development
+
+  db-core:
+    repository: ""
+    version: ""
+    status: development

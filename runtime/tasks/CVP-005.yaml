@@ -1,0 +1,35 @@
+acceptance_criteria:
+- 'REST endpoints implemented for all entities: Project, Site, CameraConfig, AIApplication,
+  Model, Rule, SceneConfig, User, FeatureFlag, Deployment'
+- Every API response is wrapped in ConfigurationObject with all required fields populated
+- api-core is used for routing and request handling — no alternative HTTP framework
+  is introduced
+- No internal implementation objects are exposed in API responses
+- 'HTTP status codes are correct: 200 OK, 201 Created, 400 Bad Request, 404 Not Found,
+  409 Conflict'
+- Configuration Platform does not import or call internal libraries of any other platform
+- Endpoints support filtering by parent entity, for example GET /sites?project_id={id}
+capabilities:
+- api
+depends_on:
+- CVP-004
+id: CVP-005
+inputs:
+- Service layer (CVP-004)
+- ConfigurationObject contract definition from platform-contracts-v1.0
+- Configuration Platform baseline specification (CVP-001)
+knowledge:
+- cv-platform-architecture
+- platform-contracts
+- technology-stack
+outputs:
+- REST API providing full CRUD for all Configuration Platform entities; all responses
+  conform to ConfigurationObject {object_type, version, owner, parameters, validation,
+  effective_date}
+owner: Claude Code
+priority: high
+role: developer
+shared_modules:
+- api-core
+status: done
+title: Implement Configuration Platform REST API with ConfigurationObject contract

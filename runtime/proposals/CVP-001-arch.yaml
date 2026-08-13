@@ -1,0 +1,251 @@
+acceptance_criteria:
+- 'Configuration Platform owns exactly: Projects, Sites, Camera Configuration records,
+  Scene Configuration records, AI Applications, Models, Rules, Users, Feature Flags,
+  Deployments'
+- Camera runtime lifecycle, health, and session state are NOT owned by Configuration
+  Platform — those belong to Camera Platform and Camera Session Manager respectively
+- All configuration exposed to other platforms is wrapped in ConfigurationObject {object_type,
+  version, owner, parameters, validation, effective_date}
+- No other platform's internal objects or libraries are imported by Configuration
+  Platform
+- PostgreSQL is the only relational database used — no alternative relational database
+  is introduced
+- REST is used for all configuration CRUD operations per Technology Stack v1.0
+- api-core and db-core are the only shared modules used — no new infrastructure modules
+  are introduced
+- No implementation code is produced in task CVP-001
+architecture: 'The Configuration Platform is the authoritative source of all system
+  configuration in the CV Platform. It is structured as a four-layer service. Layer
+  1 — REST API Layer: exposes CRUD endpoints for all owned entities using api-core;
+  every response is serialized as a ConfigurationObject. Layer 2 — Service Layer:
+  validates configuration changes, enforces versioning, manages entity lifecycle,
+  and coordinates relationships between owned entities. Layer 3 — Repository Layer:
+  one repository per configuration entity, all backed by db-core; no raw database
+  drivers permitted. Layer 4 — Database: PostgreSQL as the relational standard per
+  Technology Stack v1.0. Entity hierarchy: Project is the root aggregate. A Project
+  contains Sites, Users, Feature Flags, AI Applications, and Deployments. A Site contains
+  Camera Configuration records and Scene Configuration records. An AI Application
+  contains Models and Rules. A Deployment links an AI Application to a Site and stores
+  a versioned snapshot of configuration at deploy time. Ownership boundary: Configuration
+  Platform owns static camera configuration records (RTSP URL, credentials, capabilities,
+  resolution, codec). Camera Platform reads these records via ConfigurationObject
+  and retains exclusive ownership of runtime lifecycle, health, and session state.
+  ConfigurationObject compliance: all configuration exposed to other platforms is
+  wrapped in the standard contract with fields object_type, version, owner, parameters,
+  validation, and effective_date. No internal implementation objects cross platform
+  boundaries. Configuration propagation model for baseline: REST pull. Consumers fetch
+  ConfigurationObject by ID or query and compare the version field to detect staleness.
+  NATS JetStream push events for configuration changes are deferred to a post-baseline
+  iteration. api-core and db-core are the only shared infrastructure modules required.
+  No new infrastructure modules are introduced.'
+created_at: '2026-08-09T12:13:00Z'
+created_by: architect
+dependencies:
+- module: api-core
+  reason: REST API routing, request parsing, response serialization, and error handling
+    for all configuration endpoints
+  version: stable
+- module: db-core
+  reason: PostgreSQL persistence layer and repository base classes
+  version: stable
+- reason: Authoritative relational database standard per Technology Stack v1.0
+  technology: PostgreSQL
+  version: standard
+id: CVP-001-arch
+notes: CVP-001 is a specification-only task. No implementation code is produced. The
+  four follow-on task contracts (CVP-002 through CVP-005) form the complete implementation
+  chain for the Configuration Platform baseline. CVP-002 must be approved before any
+  developer tasks begin, as the schema is the foundation for the repository, service,
+  and API layers. R-001 (camera ownership boundary) must be explicitly enforced during
+  CVP-002 schema design to prevent a permanent architectural violation.
+reusable_modules:
+- module: api-core
+  purpose: REST API routing, request parsing, response serialization, and error handling
+    for all Configuration Platform endpoints
+- module: db-core
+  purpose: PostgreSQL connection management, query execution, transaction support,
+    and repository base classes
+risks:
+- description: 'Camera configuration ownership ambiguity: Configuration Platform owns
+    camera configuration records while Camera Platform owns camera lifecycle. If the
+    boundary is not explicitly enforced at schema design time, Camera Platform may
+    write camera configuration to its own store, creating two sources of truth.'
+  id: R-001
+  mitigation: Define at schema design time (CVP-002) that camera configuration records
+    live exclusively in the Configuration Platform database. Camera Platform reads
+    camera configuration only via ConfigurationObject through the REST API. Camera
+    Platform must not maintain its own relational camera configuration table.
+- description: 'Configuration change propagation latency: the REST pull model means
+    downstream platforms may operate on stale configuration if they cache ConfigurationObject
+    without checking the version field.'
+  id: R-002
+  mitigation: ConfigurationObject version field is mandatory in the baseline. Consumers
+    must compare version before using cached configuration. NATS JetStream push notifications
+    are the recommended long-term solution and are deferred to a post-baseline task.
+- description: 'Authorization enforcement scope: Configuration Platform owns User
+    records and Feature Flags, but authorization enforcement is a cross-cutting concern.
+    Conflating user record ownership with authorization enforcement risks embedding
+    authorization logic inside Configuration Platform.'
+  id: R-003
+  mitigation: Configuration Platform owns User records as configuration data only.
+    It does not enforce authorization across other platforms. A dedicated authorization
+    task must be defined separately and placed in the correct platform boundary.
+status: proposed
+task_contracts:
+- acceptance_criteria:
+  - 'Schema covers all owned entities: projects, sites, camera_configurations, scene_configurations,
+    ai_applications, models, rules, users, feature_flags, deployments'
+  - Project is the root entity; all other entities reference project_id with a foreign
+    key
+  - Deployment table stores a versioned JSON snapshot of configuration at deploy time
+    — no live foreign key references to mutable config entities
+  - Camera configuration records live exclusively in this schema — Camera Platform
+    has no relational camera config table
+  - Every table includes created_at, updated_at, and a version or etag column to support
+    ConfigurationObject version field
+  - PostgreSQL-only features used; no vendor-specific extensions outside the Technology
+    Stack v1.0 standard
+  - No implementation code is produced
+  capabilities:
+  - database
+  depends_on:
+  - CVP-001
+  id: CVP-002
+  inputs:
+  - Configuration Platform baseline specification (CVP-001)
+  knowledge:
+  - cv-platform-architecture
+  - platform-contracts
+  - technology-stack
+  outputs:
+  - PostgreSQL schema definition for all Configuration Platform entities
+  - Entity relationship diagram
+  - Table and column definitions with constraints
+  - Index strategy
+  owner: Claude Code
+  priority: high
+  role: architect
+  shared_modules:
+  - db-core
+  status: todo
+  title: Design Configuration Platform PostgreSQL Schema
+- acceptance_criteria:
+  - 'One repository per entity: ProjectRepository, SiteRepository, CameraConfigRepository,
+    SceneConfigRepository, AIApplicationRepository, ModelRepository, RuleRepository,
+    UserRepository, FeatureFlagRepository, DeploymentRepository'
+  - All repositories extend db-core base class — no raw database drivers
+  - No business logic in repositories — pure data access only
+  - DeploymentRepository stores and retrieves versioned JSON snapshots
+  - All queries are parameterized — no string concatenation
+  - Unit tests cover CRUD and key query methods
+  capabilities:
+  - database
+  depends_on:
+  - CVP-002
+  id: CVP-003
+  inputs:
+  - PostgreSQL schema (CVP-002)
+  - Configuration Platform baseline specification (CVP-001)
+  knowledge:
+  - cv-platform-architecture
+  - platform-contracts
+  - technology-stack
+  outputs:
+  - Repository class per entity using db-core base classes
+  - 'CRUD operations: create, read, update, delete, list'
+  - Query methods required by the service layer
+  owner: Claude Code
+  priority: high
+  role: developer
+  shared_modules:
+  - db-core
+  status: todo
+  title: Implement Configuration Platform Repository Layer
+- acceptance_criteria:
+  - Services contain all business logic — repositories contain none
+  - Every update operation increments the entity version field before persisting
+  - DeploymentService captures a full versioned snapshot of the linked AI Application
+    and Site configuration at the time of deployment
+  - Services return domain objects — they do not construct ConfigurationObject directly
+    (that belongs to the API layer)
+  - Camera runtime state and health are never accepted as input or returned as output
+    from any service method
+  - Unit tests cover validation rules, versioning, and deployment snapshot logic
+  capabilities:
+  - api
+  - database
+  depends_on:
+  - CVP-003
+  id: CVP-004
+  inputs:
+  - Repository layer (CVP-003)
+  - Configuration Platform baseline specification (CVP-001)
+  knowledge:
+  - cv-platform-architecture
+  - platform-contracts
+  outputs:
+  - 'Service class per domain area: ProjectService, SiteService, CameraConfigService,
+    AIApplicationService, DeploymentService, UserService, FeatureFlagService'
+  - Validation logic for each entity type
+  - Versioning enforcement on update operations
+  - Deployment snapshot capture at deploy time
+  owner: Claude Code
+  priority: high
+  role: developer
+  shared_modules:
+  - db-core
+  status: todo
+  title: Implement Configuration Platform Service Layer
+- acceptance_criteria:
+  - All endpoints use api-core for routing, parsing, and serialization — no custom
+    HTTP handling
+  - 'Every response is wrapped in ConfigurationObject: {object_type, version, owner,
+    parameters, validation, effective_date}'
+  - 'Endpoints cover: projects, sites, camera-configurations, scene-configurations,
+    ai-applications, models, rules, users, feature-flags, deployments'
+  - REST is the only communication protocol — no WebSocket, gRPC, or other protocols
+    in this layer
+  - No internal implementation objects returned — only ConfigurationObject payloads
+  - Integration tests cover CRUD endpoints and ConfigurationObject contract shape
+    for each entity type
+  capabilities:
+  - api
+  depends_on:
+  - CVP-004
+  id: CVP-005
+  inputs:
+  - Service layer (CVP-004)
+  - ConfigurationObject contract (platform-contracts-v1.0)
+  - Configuration Platform baseline specification (CVP-001)
+  knowledge:
+  - cv-platform-architecture
+  - platform-contracts
+  - technology-stack
+  outputs:
+  - REST endpoints for all owned entities using api-core
+  - ConfigurationObject serializer wrapping all responses
+  - API route definitions and request/response schemas
+  owner: Claude Code
+  priority: high
+  role: developer
+  shared_modules:
+  - api-core
+  status: todo
+  title: Implement Configuration Platform REST API Layer
+task_id: CVP-001
+unresolved_decisions:
+- id: UD-001
+  question: Should Configuration Platform publish configuration-change events to NATS
+    JetStream when entities are created, updated, or deleted as part of the baseline,
+    or is REST pull with version comparison sufficient?
+  recommendation: REST pull is sufficient for the baseline. NATS JetStream push events
+    for configuration changes should be added as a follow-on task once the REST API
+    is stable and consumers are identified.
+- id: UD-002
+  question: Should Deployment store a full versioned snapshot of configuration at
+    deploy time, or store live references that reflect the current state of each configuration
+    entity?
+  recommendation: Deployment must store a versioned snapshot. A live reference would
+    cause active deployments to silently change behavior when upstream configuration
+    is updated, which is unsafe in a production CV system.
+updated_at: '2026-08-09T12:13:00Z'

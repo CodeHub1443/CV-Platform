@@ -1,0 +1,50 @@
+phase: specification
+state: active
+active_agents: []
+blocked_tasks: []
+completed_tasks:
+- id: CVP-004
+  title: Implement Configuration Platform service layer
+  notes: "Implemented full service layer for the Configuration Platform.\nOutputs:\n\
+    \  - cv_platform/configuration/domain/ — domain models (11 dataclasses) and exceptions\n\
+    \  - cv_platform/configuration/repositories/interfaces.py — 10 ABC repository\
+    \ interfaces\n  - cv_platform/configuration/services/ — 10 services with input\
+    \ dataclasses and shared validation\n  - tests/configuration/ — 30+ tests covering\
+    \ project, site, and deployment services\nCross-entity rules enforced:\n  - ProjectService.delete:\
+    \ blocked when active deployments exist (via DeploymentRepository)\n  - AIApplicationService.delete:\
+    \ blocked when active deployments reference the AI application\n  - SiteService.delete:\
+    \ blocked when camera configs exist (via CameraConfigRepository)\n  - CameraConfigService.delete:\
+    \ blocked when scene configs exist (via SceneConfigRepository)\n  - DeploymentService.delete:\
+    \ blocked when status == active\nDeploymentService assembles immutable JSONB snapshots\
+    \ (AI application tree + site tree)\nat create time — active deployments are fully\
+    \ isolated from upstream config changes (R-004).\nAll services depend only on\
+    \ repository interfaces; no API layer dependencies.\n"
+- id: CVP-005
+  title: Implement Configuration Platform REST API with ConfigurationObject contract
+  notes: "Implemented full REST API layer for the Configuration Platform.\nOutputs:\n\
+    \  - cv_platform/shared/api_core/ — shared HTTP module (Router, create_app, get_json_body,\n\
+    \    configuration_object, json_ok/created/no_content) wrapping Flask\n  - cv_platform/configuration/api/_parse.py\
+    \ — request-parsing helpers (UUID, datetime, bool, int)\n  - cv_platform/configuration/api/_serializers.py\
+    \ — domain model → ConfigurationObject contract serializers\n  - cv_platform/configuration/api/projects.py\
+    \ — /api/v1/projects CRUD\n  - cv_platform/configuration/api/sites.py — /api/v1/sites\
+    \ CRUD, filters by project_id\n  - cv_platform/configuration/api/camera_configs.py\
+    \ — /api/v1/camera-configs CRUD, filters by site_id\n  - cv_platform/configuration/api/ai_applications.py\
+    \ — /api/v1/ai-applications CRUD, filters by project_id\n  - cv_platform/configuration/api/models.py\
+    \ — /api/v1/models CRUD, filters by ai_application_id\n  - cv_platform/configuration/api/rules.py\
+    \ — /api/v1/rules CRUD, filters by ai_application_id\n  - cv_platform/configuration/api/scene_configs.py\
+    \ — /api/v1/scene-configs CRUD, filters by camera_config_id\n  - cv_platform/configuration/api/users.py\
+    \ — /api/v1/users CRUD + membership endpoints\n  - cv_platform/configuration/api/feature_flags.py\
+    \ — /api/v1/feature-flags CRUD, filters by target_type/target_id\n  - cv_platform/configuration/api/deployments.py\
+    \ — /api/v1/deployments CRUD + activate/deactivate actions\n  - cv_platform/configuration/api/app.py\
+    \ — create_configuration_app() factory assembling all routers\n  - tests/configuration/api/\
+    \ — 60+ tests covering all entities, status codes, filtering, and error cases\n\
+    Error mapping: ValidationError→400, NotFoundError→404, ConflictError/OptimisticLockError→409.\n\
+    Deployment has extra POST /{id}/activate and POST /{id}/deactivate endpoints.\n\
+    Membership management: GET /users/memberships?project_id=, POST /users/{id}/memberships,\n\
+    DELETE /users/{id}/memberships/{project_id}.\nFlask added to pyproject.toml dependencies.\
+    \ api-core is the sole HTTP framework abstraction.\n"
+locks: []
+updated_at: '2026-08-12'
+architect: ''
+reviewer: ''
+current_task: ''

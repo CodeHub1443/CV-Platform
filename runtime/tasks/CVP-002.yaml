@@ -1,0 +1,34 @@
+acceptance_criteria:
+- 'Schema defines tables for all owned entities: Project, Site, CameraConfig, AIApplication,
+  Model, Rule, SceneConfig, User, FeatureFlag, Deployment'
+- Every table includes version, owner, and effective_date columns to support ConfigurationObject
+  contract
+- 'Foreign key relationships correctly reflect the entity hierarchy: Site belongs
+  to Project, CameraConfig belongs to Site, AIApplication belongs to Project, Model
+  belongs to AIApplication, Rule belongs to AIApplication, SceneConfig belongs to
+  CameraConfig, Deployment belongs to Project and references AIApplication and Site'
+- Deployment table stores a versioned snapshot rather than a live reference to prevent
+  mid-session configuration drift
+- PostgreSQL-specific constraints and types are used correctly
+- No implementation code is produced
+capabilities:
+- database
+depends_on:
+- CVP-001
+id: CVP-002
+inputs:
+- Configuration Platform baseline specification (CVP-001)
+knowledge:
+- cv-platform-architecture
+- platform-contracts
+- technology-stack
+outputs:
+- PostgreSQL schema specification covering all Configuration Platform entities with
+  versioning support
+owner: Claude Code
+priority: high
+role: architect
+shared_modules:
+- db-core
+status: done
+title: Design Configuration Platform PostgreSQL schema

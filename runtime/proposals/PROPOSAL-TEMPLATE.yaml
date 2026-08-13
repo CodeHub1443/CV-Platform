@@ -1,0 +1,26 @@
+id: ""
+
+task_id: ""
+
+status: proposed
+
+created_by: architect
+
+created_at: ""
+updated_at: ""
+
+architecture: ""
+
+reusable_modules: []
+
+task_contracts: []
+
+dependencies: []
+
+acceptance_criteria: []
+
+risks: []
+
+unresolved_decisions: []
+
+notes: ""

@@ -1,0 +1,47 @@
+# CV Platform Project Configuration
+project:
+  name: CV Platform
+  description: Computer Vision Platform
+  version: "0.1.0"
+
+aios:
+  version: "1.0"
+
+domain:
+  - computer-vision
+
+platforms: []
+
+architect:
+  default: Claude Code
+
+developer:
+  primary: Claude Code
+  parallel:
+    - Codex
+    - Qwen
+    - DeepSeek
+
+reviewer:
+  default: Claude Code
+
+ci:
+  provider: GitHub Actions
+
+shared_modules: []
+
+knowledge: []
+
+coding_standards: []
+
+technology_profiles: []
+
+repositories: []
+
+entrypoints:
+  architecture: spec/
+  specification: spec/
+
+status:
+  phase: specification
+  state: active

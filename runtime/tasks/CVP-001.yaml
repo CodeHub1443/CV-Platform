@@ -1,0 +1,35 @@
+id: CVP-001
+title: Define Configuration Platform baseline
+status: done
+priority: high
+role: architect
+owner: Claude Code
+depends_on: []
+capabilities:
+- api
+- database
+knowledge:
+- cv-platform-architecture
+- platform-contracts
+- technology-stack
+shared_modules: []
+inputs:
+- Final Architecture v1.0
+- Platform Contracts v1.0
+- Technology Stack v1.0
+outputs:
+- Configuration Platform baseline specification
+acceptance_criteria:
+- Configuration Platform responsibilities are defined according to Architecture v1.0
+- ConfigurationObject contract is respected
+- PostgreSQL is used as the relational database standard
+- Configuration does not bypass platform contracts
+- No implementation code is produced
+locked_resources: []
+notes: 'Establish the baseline specification for the Configuration Platform before
+  implementation begins.
+
+  '
+created_by: architect
+created_at: ''
+updated_at: ''
