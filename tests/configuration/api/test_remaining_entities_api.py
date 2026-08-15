@@ -269,6 +269,16 @@ class TestUsersApi:
         assert data["version"] == 1
         assert data["owner"] == "admin"
 
+    def test_get_response_does_not_contain_password_hash(self, client, user_svc):
+        user = make_user()
+        user.password_hash = "bcrypt_hashed_value"
+        user_svc.get.return_value = user
+        resp = client.get(f"/api/v1/users/{USER_ID}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "password_hash" not in data
+        assert "password_hash" not in data.get("parameters", {})
+
 
 # ── FeatureFlag ───────────────────────────────────────────────────────────────
 

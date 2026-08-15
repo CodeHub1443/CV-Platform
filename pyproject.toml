@@ -7,7 +7,12 @@ name = "cv-platform"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
+    "alembic>=1.13",
+    "bcrypt>=4.0",
     "flask>=3.0",
+    "gunicorn>=21.2",
+    "psycopg2-binary>=2.9",
+    "PyJWT>=2.8",
 ]
 
 [project.optional-dependencies]

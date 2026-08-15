@@ -1,0 +1,364 @@
+acceptance_criteria:
+- 'After CVP-010: GET /api/v1/projects without Authorization header returns 401; GET
+  /health without token returns 200; server startup fails with clear RuntimeError
+  when SECRET_KEY is absent'
+- 'After CVP-011: cv-platform-create-admin creates an admin user that can authenticate
+  via POST /api/v1/auth/token; re-running with the same username exits 1 without creating
+  a duplicate'
+- 'After CVP-012: nats_core module is importable; publish/subscribe/ensure_stream
+  work against a live NATS instance; all unit tests pass without a live NATS server'
+- 'After CVP-013: CameraDescriptor contract is produced by CameraService.get_descriptor();
+  grep for AI/inference concepts in cv_platform/camera/ returns zero matches; 20+
+  unit tests pass'
+architecture: 'All six Configuration Platform tasks (CVP-004 through CVP-009) are
+  marked done. The functional vertical slice is present: domain models, PostgreSQL
+  repositories, Alembic schema, service layer, REST API, server bootstrap, db-core
+  shared module, and auth shared module all exist in the codebase. One critical correctness
+  gap survives from CVP-009: server.py:_build_app() calls create_configuration_app()
+  without passing user_repo, so the JWT before_request hook is never registered in
+  the production WSGI entry point — all 10 entity endpoints are unprotected in production.
+  A second operational gap exists: with auth enforced there is no mechanism to create
+  the first user (bootstrap deadlock). These two gaps must be closed before the Configuration
+  Platform can be declared truly deployable. Four task contracts are proposed. CVP-010
+  wires the existing auth module into the production server and validates SECRET_KEY
+  at startup. CVP-011 adds an admin bootstrap CLI that seeds the first user directly
+  via db-core, bypassing the auth requirement. CVP-012 implements the NATS + JetStream
+  event bus as a shared module, establishing the foundational inter-platform communication
+  infrastructure required before downstream platforms (Camera Session Manager, AI
+  Runtime, etc.) can be built correctly. CVP-013 begins the Camera Platform — the
+  next platform in the canonical processing chain — with its domain models, repository
+  interfaces, and service layer, producing the CameraDescriptor contract defined in
+  Platform Contracts v1.0 section 4.1. No new permanent platform is introduced. All
+  13 platform boundaries remain intact. After CVP-013, the next reassessment should
+  address Camera Platform PostgreSQL implementation, REST API, and ONVIF/discovery
+  service integration.'
+created_at: '2026-08-15T18:03:36Z'
+created_by: architect
+dependencies:
+- CVP-010 depends on CVP-009 (done) — auth shared module must exist before it can
+  be wired
+- CVP-011 depends on CVP-010 — admin bootstrap is only meaningful once auth is active;
+  the created user must be testable end-to-end
+- CVP-012 has no dependencies — can be implemented in parallel with CVP-010/CVP-011
+- CVP-013 depends on CVP-010 — Camera Platform REST API (future) will use api-core
+  and auth; domain/service layer can be started but the overall platform presupposes
+  auth is correct
+- 'CVP-013 knowledge dependency: camera-management capability in knowledge registry
+  must be accessible before implementation begins'
+- Future Camera Platform PostgreSQL repository task will depend on CVP-013 (domain/interfaces)
+  and CVP-006 (db-core, already done)
+- Future Camera Session Manager depends on CVP-013 (CameraDescriptor contract) and
+  CVP-012 (NATS for StreamSession publication)
+id: REASSESSMENT-arch
+notes: 'The previous REASSESSMENT-arch.yaml (status: applied) proposed CVP-006 through
+  CVP-009, all of which are now done. This reassessment identifies one survivng correctness
+  gap (auth not wired — CVP-010), one operational gap (bootstrap deadlock — CVP-011),
+  one infrastructure prerequisite (NATS event bus — CVP-012), and the first task for
+  the next platform in the canonical chain (Camera Platform domain — CVP-013). The
+  Configuration Platform will be the first fully deployable and secured platform after
+  CVP-010 and CVP-011 are complete. The overall architecture remains stable at 13
+  permanent platforms. The next reassessment after CVP-013 should address Camera Platform
+  PostgreSQL repository implementation, REST API, camera credential encryption (crypto-core
+  shared module), and the ONVIF/discovery service integration.'
+reusable_modules:
+- consumers:
+  - Event Platform
+  - Camera Platform (config-change notifications)
+  - Camera Session Manager
+  - AI Runtime Platform
+  - all future event-producing platforms
+  name: nats-core
+  path: cv_platform/shared/nats_core/
+  responsibility: Async NATS + JetStream client wrapper. Provides connect(url), disconnect(),
+    publish(subject, payload), subscribe(subject, handler), and ensure_stream(name,
+    subjects) primitives. Reads NATS_URL from environment. Wraps nats-py. Zero knowledge
+    of any platform domain. Reused by every platform that publishes or consumes events.
+risks:
+- description: 'Auth not active in production: server.py:_build_app() does not pass
+    user_repo to create_configuration_app(), so the JWT before_request hook is never
+    registered. All 10 entity CRUD endpoints are publicly accessible in the current
+    production WSGI entry point.'
+  id: R-005
+  mitigation: CVP-010 must be the first task executed. Its acceptance criteria require
+    end-to-end 401 tests against the server bootstrap path, not just the Flask test
+    client used in CVP-005 tests.
+  severity: critical
+- description: 'Bootstrap deadlock: once CVP-010 wires auth, creating any user requires
+    a valid JWT, but obtaining a JWT requires an existing user. Without CVP-011, the
+    system cannot be initialized after a clean deployment.'
+  id: R-006
+  mitigation: CVP-011 must be delivered immediately after CVP-010. The CLI bypasses
+    auth entirely and operates directly on db-core, breaking the deadlock.
+  severity: high
+- description: 'Async/sync boundary for NATS: nats-py is an async-only library. The
+    Configuration Platform and Camera Platform (when its API is built) use synchronous
+    Flask + Gunicorn. Integrating an async NATS publisher into a sync request handler
+    requires an event-loop bridge (e.g., asyncio.run() in a thread) or a separate
+    async process.'
+  id: R-007
+  mitigation: CVP-012 implements the NATS shared module as a pure async module. Sync
+    platforms (Configuration, Camera API) that need to publish events run a dedicated
+    async thread with its own event loop, invoked from a sync wrapper. This pattern
+    is established in CVP-012 and documented so all future platforms follow it consistently.
+  severity: high
+- description: 'Configuration change propagation gap: when a Deployment is activated
+    or deactivated, downstream platforms (Camera Session Manager, AI Runtime) must
+    be notified. Without the event bus (CVP-012), they must poll the Configuration
+    Platform REST API. Polling increases coupling and latency.'
+  id: R-008
+  mitigation: Accept polling as the interim mechanism until CVP-012 is done. After
+    CVP-012, add a config-change event publisher to DeploymentService.activate/deactivate.
+    This is a future enhancement, not a blocker for CVP-013.
+  severity: medium
+- description: 'Credential encryption for CameraCredential: the Camera Platform must
+    store RTSP credentials. Storing them as plaintext in PostgreSQL violates security
+    requirements. The auth module provides bcrypt (one-way); camera credentials require
+    reversible encryption for RTSP URL construction.'
+  id: R-009
+  mitigation: CVP-013 defines CameraCredential with password_encrypted field (bytes).
+    The encryption mechanism (Fernet/AES-GCM via CAMERA_CREDENTIAL_KEY env var) is
+    deferred to the PostgreSQL repository task. CVP-013 domain and service layer treat
+    the field as opaque bytes — no plaintext is stored in domain objects after the
+    service boundary.
+  severity: low
+status: proposed
+task_contracts:
+- acceptance_criteria:
+  - server.py passes user_repo=_UserRepo() to create_configuration_app() so the JWT
+    before_request hook is registered
+  - _get_secret() is called during _build_app() so a missing SECRET_KEY raises RuntimeError
+    before the WSGI entry point is returned
+  - GET /health returns 200 with no Authorization header
+  - POST /api/v1/auth/token returns 200 with valid credentials and no Authorization
+    header
+  - All 10 entity endpoints return 401 when Authorization header is absent
+  - All 10 entity endpoints return 401 when the token is expired or malformed
+  - All 10 entity endpoints return the correct response when a valid JWT is supplied
+  - Existing CVP-005 and CVP-008 tests continue to pass (they use test Flask client
+    that bypasses the server bootstrap)
+  capabilities:
+  - authentication
+  - api
+  depends_on: []
+  id: CVP-010
+  inputs:
+  - cv_platform/configuration/server.py — _build_app() does not pass user_repo to
+    create_configuration_app()
+  - cv_platform/configuration/api/app.py — create_configuration_app() activates auth
+    middleware only when user_repo is provided
+  - cv_platform/shared/auth/_jwt.py — _get_secret() raises RuntimeError when SECRET_KEY
+    is absent
+  - cv_platform/shared/auth/_middleware.py — require_auth decorator
+  knowledge:
+  - authentication
+  outputs:
+  - 'cv_platform/configuration/server.py — updated _build_app(): passes user_repo=_UserRepo()
+    to create_configuration_app(); calls _get_secret() eagerly before port is bound
+    so SECRET_KEY absence fails startup, not first request'
+  - 'tests/configuration/api/test_server_auth.py — integration tests confirming: all
+    entity endpoints return 401 without a valid token; /health returns 200 without
+    a token; /api/v1/auth/token returns 200 without a token; a valid token grants
+    access'
+  owner: ''
+  priority: critical
+  role: Developer
+  shared_modules:
+  - auth
+  - db-core
+  - api-core
+  status: todo
+  title: Wire JWT authentication into the production server
+- acceptance_criteria:
+  - Running the command with a valid DATABASE_URL and new username creates a User
+    row with bcrypt-hashed password and is_superuser=True
+  - Running the command a second time with the same username exits with code 1 and
+    a clear error message — no duplicate user is created
+  - PASSWORD is never logged or printed; only success/failure status is output
+  - DATABASE_URL absent at invocation raises a clear error before any DB connection
+    is attempted
+  - SECRET_KEY is not required by the CLI — it must operate independently of the auth
+    module
+  - The created user can authenticate via POST /api/v1/auth/token after CVP-010 wiring
+    is in place
+  capabilities:
+  - database
+  - authentication
+  depends_on:
+  - CVP-010
+  id: CVP-011
+  inputs:
+  - cv_platform/configuration/domain/models.py — User dataclass with password_hash
+    field
+  - cv_platform/configuration/repositories/postgres/user_repo.py — PostgresUserRepository.create(),
+    get_by_username()
+  - cv_platform/shared/db_core/ — init_db(), get_session()
+  - pyproject.toml — entry_points or scripts section for CLI registration
+  knowledge:
+  - database
+  - authentication
+  outputs:
+  - cv_platform/configuration/cli/__init__.py — empty package marker
+  - cv_platform/configuration/cli/create_admin.py — runnable as 'python -m cv_platform.configuration.cli.create_admin';
+    reads DATABASE_URL from env; accepts --username and --password args; creates User
+    with is_superuser=True, bcrypt-hashed password; exits 0 on success, exits 1 with
+    clear message if user already exists or DATABASE_URL is absent
+  - 'pyproject.toml — [project.scripts] entry: cv-platform-create-admin = ''cv_platform.configuration.cli.create_admin:main'''
+  - 'tests/configuration/cli/test_create_admin.py — unit tests: successful creation,
+    duplicate username exits 1, missing DATABASE_URL exits 1, password is bcrypt-hashed
+    (not stored plaintext)'
+  owner: ''
+  priority: critical
+  role: Developer
+  shared_modules:
+  - db-core
+  status: todo
+  title: Admin bootstrap CLI — first-user seed command
+- acceptance_criteria:
+  - connect() establishes a NATS connection using NATS_URL env var; raises RuntimeError
+    if NATS_URL is absent
+  - disconnect() drains and closes the connection gracefully
+  - publish(subject, payload) publishes bytes to the given NATS subject; raises RuntimeError
+    if called before connect()
+  - subscribe(subject, handler) registers an async callback invoked for each message
+    on the subject
+  - ensure_stream(name, subjects) creates a JetStream stream idempotently (no error
+    if stream already exists with compatible config)
+  - Module contains zero platform-domain imports — it is fully platform-agnostic and
+    importable standalone
+  - nats-py added to pyproject.toml dependencies
+  - Unit tests pass without a live NATS server (mock or in-process)
+  capabilities:
+  - event-bus
+  depends_on: []
+  id: CVP-012
+  inputs:
+  - docs/standards/technology-stack-v1.0.md — NATS + JetStream is the standard event
+    bus; ZeroMQ only for ultra-low-latency internal components
+  - docs/contracts/platform-contracts-v1.0.md — contract chain and dependency rules
+  - cv_platform/shared/api_core/ and cv_platform/shared/db_core/ — reference pattern
+    for how shared modules are structured
+  knowledge:
+  - event-bus
+  outputs:
+  - 'cv_platform/shared/nats_core/__init__.py — public surface: connect, disconnect,
+    publish, subscribe, ensure_stream'
+  - cv_platform/shared/nats_core/_connection.py — async NATS connection manager; reads
+    NATS_URL from env; connect() and disconnect() coroutines; singleton pattern with
+    asyncio.Lock
+  - 'cv_platform/shared/nats_core/_publisher.py — publish(subject: str, payload: bytes)
+    coroutine; raises RuntimeError if not connected'
+  - 'cv_platform/shared/nats_core/_subscriber.py — subscribe(subject: str, handler:
+    Callable[[bytes], Awaitable[None]]) coroutine; unsubscribe() coroutine'
+  - 'cv_platform/shared/nats_core/_stream.py — ensure_stream(name: str, subjects:
+    list[str]) JetStream stream creation/idempotent setup'
+  - pyproject.toml — nats-py>=2.6 added to dependencies
+  - 'tests/shared/nats_core/ — unit tests using mock NATS client: connect/disconnect
+    lifecycle, publish sends to correct subject, subscribe routes to handler, missing
+    NATS_URL raises RuntimeError, double-connect is idempotent'
+  owner: ''
+  priority: high
+  role: Developer
+  shared_modules: []
+  status: todo
+  title: Implement Event Bus shared module (NATS + JetStream)
+- acceptance_criteria:
+  - All Camera domain models are dataclasses with id (UUID), version (int), created_at,
+    updated_at fields following the same pattern as Configuration Platform domain
+    models
+  - CameraDescriptor contract in cv_platform/camera/domain/contracts.py matches all
+    fields defined in Platform Contracts v1.0 section 4.1 (Camera ID, Name, Vendor,
+    RTSP URL, Credentials, Capabilities, Resolution, FPS, Codec, Location, Health
+    Status)
+  - CameraService.get_descriptor(id) assembles and returns a CameraDescriptor from
+    Camera + CameraCredential domain objects
+  - No import in cv_platform/camera/ references cv_platform/configuration/, cv_platform/shared/api_core/,
+    or any AI/inference concept — Law 1 is verifiable by grep
+  - CameraRepository and CameraCredentialRepository are abstract base classes with
+    no concrete implementation in this task (PostgreSQL implementation is deferred)
+  - All CameraService methods raise the correct domain exceptions (CameraNotFoundError,
+    CameraConflictError, CameraValidationError) on invalid input
+  - 20+ unit tests pass using in-memory stub repositories
+  - Camera Platform package structure matches cv_platform/camera/ and is importable
+    without any runtime dependency on Configuration Platform internals
+  capabilities:
+  - camera-management
+  - database
+  depends_on:
+  - CVP-010
+  id: CVP-013
+  inputs:
+  - docs/architecture/final-architecture-v1.0.md — section 4.2 Camera Platform responsibilities
+    and Architectural Law 1 (Camera Platform never knows AI exists)
+  - docs/contracts/platform-contracts-v1.0.md — section 4.1 CameraDescriptor contract
+    (the Camera Platform's outward contract)
+  - cv_platform/configuration/domain/models.py — reference pattern for domain dataclasses
+    with version fields
+  - cv_platform/configuration/repositories/interfaces.py — reference pattern for ABC
+    repository interfaces
+  - cv_platform/configuration/services/ — reference pattern for service layer with
+    cross-entity guards
+  knowledge:
+  - camera-management
+  outputs:
+  - cv_platform/camera/__init__.py
+  - cv_platform/camera/domain/__init__.py
+  - 'cv_platform/camera/domain/models.py — dataclasses: Camera (id, name, vendor,
+    rtsp_url, site_id, is_active, health_status, resolution, fps, codec, location,
+    capabilities, version, created_at, updated_at), CameraCredential (id, camera_id,
+    username, password_encrypted, version), CameraCapability (ptz, audio, onvif_profile,
+    etc.), CameraHealth (camera_id, state, last_seen, message)'
+  - cv_platform/camera/domain/exceptions.py — CameraNotFoundError, CameraConflictError,
+    CameraValidationError, CredentialError (all extend a base CameraPlatformError)
+  - cv_platform/camera/domain/contracts.py — CameraDescriptor dataclass matching Platform
+    Contracts v1.0 section 4.1 (the outward contract produced by Camera Platform and
+    consumed by Camera Session Manager)
+  - cv_platform/camera/repositories/__init__.py
+  - cv_platform/camera/repositories/interfaces.py — CameraRepository ABC (get, list,
+    create, update, delete, find_by_site, find_by_rtsp_url), CameraCredentialRepository
+    ABC (get_by_camera, upsert, delete)
+  - cv_platform/camera/services/__init__.py
+  - 'cv_platform/camera/services/camera_service.py — CameraService: register(input)
+    -> Camera, get(id) -> Camera, list(site_id, is_active) -> list[Camera], update(input)
+    -> Camera, deregister(id), get_descriptor(id) -> CameraDescriptor; enforces Law
+    1 (no AI inference logic)'
+  - tests/camera/ — 20+ unit tests covering CameraService CRUD, get_descriptor produces
+    correct CameraDescriptor contract fields, deregister blocked when Camera has active
+    sessions (guarded by a SessionRepository stub), Law 1 verified (no AI or inference
+    imports anywhere in cv_platform/camera/)
+  owner: ''
+  priority: high
+  role: Developer
+  shared_modules:
+  - db-core
+  status: todo
+  title: Camera Platform — domain models, repository interfaces, and service layer
+task_id: REASSESSMENT
+unresolved_decisions:
+- id: D-003
+  impact: medium
+  question: 'NATS event publishing from synchronous Flask context: should the Configuration
+    Platform publish deployment-activation events synchronously (blocking the request
+    with asyncio.run()) or fire-and-forget via a background thread pool?'
+  recommendation: Fire-and-forget via a shared asyncio event loop running in a daemon
+    thread. The request does not block on NATS delivery. Delivery failure is logged
+    but does not fail the HTTP request. This matches the eventual-consistency model
+    appropriate for config-change notifications.
+- id: D-004
+  impact: medium
+  question: 'Camera credential encryption key management: Fernet (symmetric, key rotation
+    friendly) vs AES-GCM (lower-level, more control). Both require a CAMERA_CREDENTIAL_KEY
+    environment variable.'
+  recommendation: Use cryptography.fernet.Fernet for CVP-013's follow-on repository
+    task. It handles key rotation via MultiFernet and has a simpler API than raw AES-GCM.
+    Introduce a shared cv_platform/shared/crypto_core/ module to avoid duplicating
+    the encryption pattern across platforms.
+- id: D-005
+  impact: low
+  question: 'Camera Platform discovery: ONVIF requires onvif-zeep-async (large async
+    SOAP dependency). Should the first Camera Platform task include discovery services
+    or defer them to a later task focused solely on camera discovery?'
+  recommendation: CVP-013 and its follow-on (PostgreSQL + API) should NOT include
+    ONVIF. Discovery services are a separate concern. After CVP-013, a dedicated CVP-01N
+    implements CameraDiscoveryService with ONVIF + passive ARP scan as the minimum
+    viable discovery mechanism. SSDP and mDNS follow without architectural change.
+updated_at: '2026-08-15T18:03:36Z'

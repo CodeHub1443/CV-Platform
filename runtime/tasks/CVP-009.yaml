@@ -1,0 +1,71 @@
+acceptance_criteria:
+- POST /api/v1/auth/token with valid credentials returns a signed JWT containing user_id
+  and roles claims
+- POST /api/v1/auth/token with invalid credentials returns 401
+- 'All Configuration Platform endpoints except /health and /api/v1/auth/token require
+  a valid Authorization: Bearer <token> header'
+- Expired or malformed JWT returns 401
+- JWT payload carries user_id; require_auth makes current user available to route
+  handlers via get_current_user()
+- SECRET_KEY missing at startup raises a clear configuration error
+- Password verification uses bcrypt — plaintext comparison is forbidden
+- auth shared module has zero imports from any platform domain — it is fully platform-agnostic
+- PyJWT and bcrypt added to pyproject.toml dependencies
+capabilities:
+- authentication
+depends_on:
+- CVP-008
+id: CVP-009
+inputs:
+- cv_platform/configuration/domain/models.py — User model with password_hash field
+  added in CVP-007
+- cv_platform/configuration/repositories/interfaces.py — UserRepository ABC
+- cv_platform/configuration/repositories/postgres/user_repo.py — find_by_username
+  implementation from CVP-007
+- cv_platform/shared/api_core/_router.py — Router pattern for middleware integration
+knowledge:
+- authentication
+outputs:
+- 'cv_platform/shared/auth/__init__.py — public surface: issue_token, require_auth,
+  get_current_user'
+- cv_platform/shared/auth/_jwt.py — JWT encode/decode using PyJWT; reads SECRET_KEY
+  from env
+- cv_platform/shared/auth/_middleware.py — require_auth decorator compatible with
+  Flask before_request and route decorator pattern
+- cv_platform/configuration/api/auth.py — POST /api/v1/auth/token endpoint (username
+  + password -> JWT via bcrypt hash verification)
+- cv_platform/configuration/api/app.py — updated to register auth router and apply
+  require_auth to all protected routes
+- pyproject.toml — PyJWT and bcrypt added as dependencies
+- tests/shared/auth/ — unit tests for token issuance, expiry, and invalid-token rejection
+- 'tests/configuration/api/test_auth.py — integration tests: protected route with
+  valid token, expired token (401), missing token (401)'
+owner: ''
+priority: high
+role: developer
+shared_modules:
+- db-core
+- api-core
+status: done
+notes: "Implemented auth shared module and Configuration Platform JWT middleware.\n\
+  Outputs:\n  - cv_platform/shared/auth/_jwt.py — issue_token / decode_token via PyJWT;\
+  \ reads\n    SECRET_KEY from env; raises RuntimeError with clear message if missing.\n\
+  \  - cv_platform/shared/auth/_middleware.py — require_auth decorator; sets g._auth_user\n\
+  \    on success; returns 401 for missing/expired/invalid tokens.\n  - cv_platform/shared/auth/__init__.py\
+  \ — public surface: issue_token, require_auth,\n    get_current_user.  Zero platform-domain\
+  \ imports.\n  - cv_platform/configuration/api/auth.py — POST /api/v1/auth/token;\
+  \ bcrypt password\n    verification; returns signed JWT with user_id and roles claims.\n\
+  \  - cv_platform/configuration/api/app.py — updated with optional user_repo param;\n\
+  \    when provided: registers auth router, calls _get_secret() eagerly (startup\
+  \ check),\n    and applies before_request hook that exempts /health and /api/v1/auth/token.\n\
+  \    Backward-compatible: existing tests that don't pass user_repo are unaffected.\n\
+  \  - pyproject.toml — PyJWT>=2.8 and bcrypt>=4.0 added.\n  - tests/shared/auth/test_jwt.py\
+  \ — unit tests: issue, decode, expiry, wrong sig, missing key.\n  - tests/shared/auth/test_middleware.py\
+  \ — unit tests: valid token, missing/expired/\n    invalid header, get_current_user\
+  \ payload.\n  - tests/configuration/api/test_auth.py — integration tests: token\
+  \ endpoint (valid,\n    wrong password, unknown user, missing fields), protected\
+  \ routes (valid token,\n    no token 401, expired 401, malformed 401), exempt paths,\
+  \ startup validation.\nNote: server.py was not modified (not in task outputs); to\
+  \ enable auth in production\nthe _build_app() in server.py should pass user_repo=_UserRepo()\
+  \ to create_configuration_app.\n"
+title: Implement auth shared module and Configuration Platform JWT middleware

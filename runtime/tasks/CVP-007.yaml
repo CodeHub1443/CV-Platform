@@ -1,0 +1,87 @@
+acceptance_criteria:
+- All 10 repository ABCs are fully implemented with no unimplemented abstract methods
+- 'User domain model is updated to include password_hash: Optional[str] = None; the
+  field is excluded from all API serializers and does not appear in any HTTP response
+  body'
+- 'UserRepository concrete implementation includes find_by_username(username: str)
+  -> Optional[User] for auth credential lookup'
+- 'Optimistic locking: every UPDATE statement includes WHERE id = ? AND version =
+  expected_version; OptimisticLockError is raised when rows_affected = 0'
+- 'JSONB columns used for: CameraConfig.credentials, CameraConfig.resolution, CameraConfig.capabilities,
+  Model.parameters, Rule.parameters, SceneConfig.rois, SceneConfig.zones, SceneConfig.ground_plane,
+  SceneConfig.privacy_masks, SceneConfig.calibration, Deployment.ai_application_snapshot,
+  Deployment.site_snapshot'
+- has_any_for_site, has_any_for_camera_config, has_active_by_project, has_active_by_ai_application,
+  has_active_by_site return correct boolean using EXISTS queries
+- Alembic migration 001 runs cleanly on an empty PostgreSQL database and includes
+  the users.password_hash column
+- Alembic downgrade reverses the migration cleanly
+- 'Integration tests cover: create, get, list (with filters), update (optimistic lock
+  success and failure), delete, all boolean guard methods'
+- A test asserts that GET /api/v1/users/{id} response body does not contain a password_hash
+  field
+- alembic added to pyproject.toml dependencies
+capabilities:
+- database
+depends_on:
+- CVP-006
+id: CVP-007
+inputs:
+- cv_platform/configuration/repositories/interfaces.py — 10 ABC repository contracts
+- cv_platform/configuration/domain/models.py — 11 domain dataclasses with version
+  fields
+- cv_platform/configuration/api/_serializers.py — serializers that must be updated
+  to exclude password_hash
+- cv_platform/shared/db_core/ — session and pool primitives
+knowledge:
+- database
+outputs:
+- 'cv_platform/configuration/domain/models.py — User dataclass updated with password_hash:
+  Optional[str] = None'
+- cv_platform/configuration/api/_serializers.py — user serializer updated to exclude
+  password_hash from all response payloads
+- cv_platform/configuration/repositories/postgres/__init__.py
+- cv_platform/configuration/repositories/postgres/project_repo.py
+- cv_platform/configuration/repositories/postgres/site_repo.py
+- cv_platform/configuration/repositories/postgres/camera_config_repo.py
+- cv_platform/configuration/repositories/postgres/ai_application_repo.py
+- cv_platform/configuration/repositories/postgres/model_repo.py
+- cv_platform/configuration/repositories/postgres/rule_repo.py
+- cv_platform/configuration/repositories/postgres/scene_config_repo.py
+- cv_platform/configuration/repositories/postgres/user_repo.py — includes find_by_username(username)
+  -> Optional[User]
+- cv_platform/configuration/repositories/postgres/feature_flag_repo.py
+- cv_platform/configuration/repositories/postgres/deployment_repo.py
+- alembic.ini — Alembic migration configuration
+- alembic/env.py
+- alembic/versions/001_configuration_platform.py — initial schema for all 10 entities
+  including users.password_hash column
+- pyproject.toml — alembic added as dependency
+- tests/configuration/repositories/ — integration tests against a real PostgreSQL
+  instance
+notes: "Implemented all 10 PostgreSQL repository concrete classes and Alembic schema.\n\
+  Outputs produced:\n  - cv_platform/configuration/domain/models.py — password_hash:\
+  \ Optional[str] = None added to User\n  - cv_platform/configuration/api/_serializers.py\
+  \ — no change needed; serialize_user already omits password_hash\n  - cv_platform/configuration/repositories/postgres/\
+  \ — 10 concrete repos (psycopg2 raw SQL)\n  - alembic.ini, alembic/env.py — DATABASE_URL\
+  \ env var or ini key for connection\n  - alembic/versions/001_configuration_platform.py\
+  \ — 11 tables (10 entities + project_users), all JSONB columns, password_hash\n\
+  \  - pyproject.toml — alembic>=1.13 added\n  - tests/configuration/repositories/\
+  \ — integration tests (require DATABASE_URL; schema auto-applied via Alembic)\n\
+  Key design decisions:\n  - Repos accept conn (psycopg2 connection) in __init__;\
+  \ caller manages transaction life via get_session()\n  - Optimistic locking: UPDATE\
+  \ WHERE id=? AND version=project.version-1; raises OptimisticLockError if no row\
+  \ returned\n  - psycopg2.extras.register_uuid() called in postgres/__init__.py so\
+  \ UUID columns round-trip as uuid.UUID\n  - JSONB write: psycopg2.extras.Json(value);\
+  \ JSONB read: auto-deserialized by psycopg2>=2.9\n  - find_by_username delegates\
+  \ to get_by_username (returns User including password_hash from DB)\n  - EXISTS\
+  \ queries used for all 5 boolean guard methods\n  - Integration tests wrap each\
+  \ test in a rolled-back transaction for isolation\n"
+owner: ''
+priority: critical
+role: developer
+shared_modules:
+- db-core
+status: done
+title: Implement Configuration Platform PostgreSQL repository layer, Alembic schema,
+  and User credential field

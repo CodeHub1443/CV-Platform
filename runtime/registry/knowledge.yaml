@@ -1,4 +1,4 @@
-knowledge:
+﻿knowledge:
 
   cv-platform-architecture:
     name: CV Platform Final Architecture v1.0
@@ -15,6 +15,11 @@ knowledge:
     description: Authoritative infrastructure and technology standards
     path: docs/standards/technology-stack-v1.0.md
 
+
+  ai-runtime-platform:
+    name: AI Runtime Platform Design v1.0
+    description: Authoritative internal architecture of the reusable AI Runtime Platform
+    path: docs/platforms/ai-runtime/ai-runtime-platform-design-v1.0.md
   deepstream:
     name: DeepStream SDK
     description: NVIDIA DeepStream SDK integration and pipeline patterns

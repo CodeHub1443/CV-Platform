@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from flask import Flask
+from typing import Optional
+
+from flask import Flask, request
 
 from cv_platform.configuration.api.ai_applications import make_ai_applications_router
 from cv_platform.configuration.api.camera_configs import make_camera_configs_router
@@ -18,6 +20,7 @@ from cv_platform.configuration.domain.exceptions import (
     OptimisticLockError,
     ValidationError,
 )
+from cv_platform.configuration.repositories.interfaces import UserRepository
 from cv_platform.configuration.services.ai_application_service import AIApplicationService
 from cv_platform.configuration.services.camera_config_service import CameraConfigService
 from cv_platform.configuration.services.deployment_service import DeploymentService
@@ -37,6 +40,8 @@ _ERROR_MAP: dict[type, int] = {
     ConflictError: 409,
 }
 
+_AUTH_EXEMPT_PATHS = frozenset({"/health", "/api/v1/auth/token"})
+
 
 def create_configuration_app(
     project_service: ProjectService,
@@ -49,6 +54,7 @@ def create_configuration_app(
     user_service: UserService,
     feature_flag_service: FeatureFlagService,
     deployment_service: DeploymentService,
+    user_repo: Optional[UserRepository] = None,
     config: dict | None = None,
 ) -> Flask:
     """Assemble the Configuration Platform Flask application."""
@@ -64,4 +70,23 @@ def create_configuration_app(
         make_feature_flags_router(feature_flag_service),
         make_deployments_router(deployment_service),
     ]
+
+    if user_repo is not None:
+        from cv_platform.configuration.api.auth import make_auth_router
+        from cv_platform.shared.auth._jwt import _get_secret
+        from cv_platform.shared.auth._middleware import require_auth
+
+        _get_secret()  # fail fast if SECRET_KEY is missing at startup
+        routers.append(make_auth_router(user_repo))
+        flask_app = create_app(routers, error_map=_ERROR_MAP, config=config)
+        _auth_check = require_auth(lambda: None)
+
+        @flask_app.before_request
+        def _enforce_auth():
+            if request.path in _AUTH_EXEMPT_PATHS:
+                return
+            return _auth_check()
+
+        return flask_app
+
     return create_app(routers, error_map=_ERROR_MAP, config=config)

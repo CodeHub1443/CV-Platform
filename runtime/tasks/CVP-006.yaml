@@ -1,0 +1,51 @@
+acceptance_criteria:
+- get_session() is a context manager that yields a connection, commits on normal exit,
+  rolls back on exception
+- init_db(url) initialises the pool; DATABASE_URL env var is used when url is not
+  supplied
+- No ORM or query-builder is imposed — bare psycopg2-binary cursors are exposed
+- Module exposes no Configuration Platform or domain knowledge
+- Module is importable by any future platform repository without modification
+- Tests verify commit, rollback, and pool re-use behaviour
+- psycopg2-binary added to pyproject.toml dependencies
+capabilities:
+- database
+depends_on: []
+id: CVP-006
+inputs:
+- docs/standards/technology-stack-v1.0.md — PostgreSQL is the standard relational
+  store
+- cv_platform/shared/api_core/ — reference for how a shared module is structured and
+  exported
+knowledge:
+- database
+outputs:
+- 'cv_platform/shared/db_core/__init__.py — public surface: get_session, init_db'
+- cv_platform/shared/db_core/_pool.py — connection pool initialised from DATABASE_URL
+  env var
+- cv_platform/shared/db_core/_session.py — get_session() context manager (begin, commit,
+  rollback, close)
+- pyproject.toml — psycopg2-binary added as dependency
+- tests/shared/db_core/ — unit tests with real or in-process PostgreSQL (pytest-postgresql
+  or testcontainers)
+owner: ''
+priority: critical
+role: developer
+shared_modules: []
+status: completed
+notes: |
+  Implemented db_core shared module.
+  Outputs:
+    - cv_platform/shared/db_core/__init__.py — public surface: get_session, init_db
+    - cv_platform/shared/db_core/_pool.py — ThreadedConnectionPool; init_db(url) with
+      DATABASE_URL env fallback; double-init idempotent; _reset_pool() test helper
+    - cv_platform/shared/db_core/_session.py — get_session() context manager; commits
+      on normal exit, rolls back and re-raises on exception, always returns conn to pool
+    - pyproject.toml — psycopg2-binary>=2.9 added to dependencies
+    - tests/shared/db_core/test_db_core.py — 14 unit tests (no real PG required):
+        TestInitDb: supplied URL, env fallback, no-URL error, double-init idempotency, uninitialised error
+        TestGetSessionCommit: commit called, putconn called, autocommit=False
+        TestGetSessionRollback: rollback called, putconn called, exception propagates
+        TestPoolReuse: same pool used across sessions, get_pool returns correct object
+  Module contains no Configuration Platform or domain knowledge; importable standalone.
+title: Implement db-core shared module (PostgreSQL)

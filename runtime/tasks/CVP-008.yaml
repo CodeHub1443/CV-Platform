@@ -1,0 +1,54 @@
+acceptance_criteria:
+- Running the server with a valid DATABASE_URL starts without error
+- All 10 entity endpoints respond correctly end-to-end (HTTP -> service -> repository
+  -> PostgreSQL)
+- 'GET /health returns 200 with {"status": "ok"}'
+- DATABASE_URL missing at startup raises a clear configuration error before the port
+  is bound
+- 'Graceful shutdown on SIGTERM: in-flight requests complete and the connection pool
+  is closed'
+- No service or repository is instantiated outside the composition root
+- gunicorn added to pyproject.toml dependencies
+capabilities:
+- api
+depends_on:
+- CVP-007
+id: CVP-008
+inputs:
+- cv_platform/configuration/api/app.py — create_configuration_app() factory signature
+- cv_platform/configuration/repositories/postgres/ — concrete repository implementations
+- cv_platform/configuration/services/ — 10 service classes
+knowledge:
+- api
+outputs:
+- 'cv_platform/configuration/server.py — composition root: reads DATABASE_URL from
+  env, constructs repos, services, and Flask app'
+- 'cv_platform/configuration/api/health.py — /health GET endpoint returning 200 {"status":
+  "ok"}'
+- pyproject.toml — gunicorn added as dependency
+- Gunicorn entry point declared (cv_platform.configuration.server:app or WSGI factory)
+notes: "Implemented server bootstrap and composition root.\nOutputs produced:\n  -\
+  \ cv_platform/configuration/api/health.py — Flask blueprint for GET /health returning\
+  \ 200 {\"status\": \"ok\"}\n  - cv_platform/configuration/server.py — composition\
+  \ root: reads DATABASE_URL (raises RuntimeError if missing), calls init_db(), wires\
+  \ 10 session-bound repo wrappers + 10 services + Flask app\n  - pyproject.toml —\
+  \ gunicorn>=21.2 added to dependencies\nKey design decisions:\n  - Session-bound\
+  \ repo wrappers (_ProjectRepo, etc.) implement abstract interfaces and delegate\
+  \ to concrete Postgres repos using the per-request connection from Flask g\n  - Per-request\
+  \ connection: before_request opens a pool connection (autocommit=False), teardown_request\
+  \ commits or rolls back based on psycopg2 transaction status, then returns to pool\n\
+  \  - /health endpoint skips DB connection entirely (before_request short-circuits\
+  \ on path == /health)\n  - atexit.register(_close_pool) closes the connection pool\
+  \ on process exit (works for gunicorn workers and dev server)\n  - All 10 repos\
+  \ and 10 services are instantiated exactly once in _build_app() (composition root\
+  \ guarantee)\n  - WSGI entry point: cv_platform.configuration.server:app\n  - DATABASE_URL\
+  \ absence raises RuntimeError before the port is bound (app = _build_app() at module\
+  \ level)\n"
+owner: ''
+priority: high
+role: developer
+shared_modules:
+- db-core
+- api-core
+status: done
+title: Implement Configuration Platform server bootstrap and composition root

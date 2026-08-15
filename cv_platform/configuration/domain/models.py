@@ -126,6 +126,7 @@ class User:
     email: str
     owner: str
     effective_date: datetime
+    password_hash: Optional[str] = None
     status: str = "active"
     is_active: bool = True
     version: int = 1
